@@ -17421,7 +17421,10 @@ const skills = {
 
 			// step 0
 			var fang = player.countMark("fangquan2") == 0 && player.hp >= 2 && player.countCards("h") <= player.maxHp + 1;
-			result = await player
+			if (lib.skill.fangquan.getForcedTarget(player)) {
+				result = { bool: true };
+			} else
+				result = await player
 				.chooseBool(get.prompt2("refangquan"))
 				.set("ai", function () {
 					if (!_status.event.fang) {

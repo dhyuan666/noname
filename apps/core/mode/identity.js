@@ -2148,6 +2148,23 @@ export default {
 						game.me.setIdentity();
 						game.me.node.identity.classList.remove("guessing");
 					}
+					//帮队友选将：主公帮忠臣，忠臣帮主公和其他忠臣，反贼帮其他反贼，内奸不帮
+					event.helpTargets = (() => {
+						if (get.config("help_choose") === false || event.zhongmode || stratagemMode || event.chosen.length || _status.brawl) {
+							return [];
+						}
+						const myIdentity = game.me.identity;
+						if (myIdentity === "zhu") {
+							return game.filterPlayer(current => current !== game.me && current.identity === "zhong");
+						}
+						if (myIdentity === "zhong") {
+							return game.filterPlayer(current => current !== game.me && (current.identity === "zhong" || current.identity === "zhu"));
+						}
+						if (myIdentity === "fan") {
+							return game.filterPlayer(current => current !== game.me && current.identity === "fan");
+						}
+						return [];
+					})();
 					//选将框分配
 					for (const name in lib.characterReplace) {
 						const replacements = lib.characterReplace[name];
@@ -2231,6 +2248,8 @@ export default {
 					event.list.randomSort();
 					_status.characterlist = list4.slice(0).randomSort();
 					list3.randomSort();
+					event.getZhuList = getZhuList;
+					event.list3 = list3;
 					if (_status.brawl && _status.brawl.chooseCharacterFilter) {
 						_status.brawl.chooseCharacterFilter(event.list, getZhuList(), list3);
 					}
@@ -2244,9 +2263,12 @@ export default {
 					if (stratagemMode) {
 						list = event.list.slice(0, num);
 					} else if (game.zhu !== game.me) {
-						event.ai(game.zhu, event.list, getZhuList());
-						event.list.remove(get.sourceCharacter(game.zhu.name1));
-						event.list.remove(get.sourceCharacter(game.zhu.name2));
+						//主公由玩家代选时，推迟到玩家选完自己的武将之后
+						if (!event.helpTargets.includes(game.zhu)) {
+							event.ai(game.zhu, event.list, getZhuList());
+							event.list.remove(get.sourceCharacter(game.zhu.name1));
+							event.list.remove(get.sourceCharacter(game.zhu.name2));
+						}
 						if (_status.brawl && _status.brawl.chooseCharacter) {
 							list = _status.brawl.chooseCharacter(event.list, num);
 							if (list === false || list === "nozhu") {
@@ -2468,8 +2490,55 @@ export default {
 						game.me.maxHp++;
 						game.me.update();
 					}
+					event.helpGroups = new Map();
+					for (const target of event.helpTargets) {
+						const isZhu = target === game.zhu;
+						const inList = name => event.list.includes(name);
+						let candidates;
+						if (isZhu) {
+							candidates = event
+								.getZhuList()
+								.filter(inList)
+								.concat(event.list3.filter(inList).slice(0, get.config("choice_zhu")))
+								.unique();
+						} else {
+							event.list.randomSort();
+							candidates = event.list.slice(0, get.config(`choice_${target.identity}`));
+						}
+						const count = get.config("double_character") ? 2 : 1;
+						const helpResult = await game.me
+							.chooseButton([`帮${get.translation(`${target.identity}2`)}选择角色`, [candidates, "characterx"]], count, true)
+							.set("direct", true)
+							.forResult();
+						const names = helpResult.links;
+						if (!names?.length) {
+							continue;
+						}
+						const helpType = get.selectGroup(names[0], true);
+						if (helpType !== "default") {
+							target._groupChosen = helpType;
+						}
+						const helpGroups = get.selectGroup(names[0]);
+						if (helpGroups.length) {
+							const helpGroupResult = await game.me
+								.chooseButton([`请为${get.translation(`${target.identity}2`)}选择势力`, [helpGroups.map(group => ["", "", `group_${group}`]), "vcard"]], true)
+								.set("direct", true)
+								.forResult();
+							if (helpGroupResult.links?.length) {
+								event.helpGroups.set(target, helpGroupResult.links[0][2].slice(6));
+							}
+						}
+						target.init(names[0], names[1]);
+						event.list.remove(get.sourceCharacter(target.name1));
+						event.list.remove(get.sourceCharacter(target.name2));
+						if (isZhu && game.players.length > 4 && !target.isInitFilter("noZhuHp")) {
+							target.hp++;
+							target.maxHp++;
+							target.update();
+						}
+					}
 					for (const currentPlayer of game.players) {
-						if ((event.stratagemMode || currentPlayer !== game.zhu) && currentPlayer !== game.me) {
+						if ((event.stratagemMode || currentPlayer !== game.zhu) && currentPlayer !== game.me && !event.helpTargets.includes(currentPlayer)) {
 							event.list.randomSort();
 							event.ai(currentPlayer, event.list.splice(0, get.config(`choice_${currentPlayer.identity}`)), null, event.list);
 						}
@@ -2477,6 +2546,11 @@ export default {
 				},
 				// step 2
 				async (event, trigger, player) => {
+					for (const [target, group] of event.helpGroups ?? []) {
+						target.group = group;
+						target.node.name.dataset.nature = get.groupnature(group);
+						target.update();
+					}
 					if (event.group) {
 						game.me.group = event.group;
 						game.me.node.name.dataset.nature = get.groupnature(game.me.group);

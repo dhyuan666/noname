@@ -3997,11 +3997,23 @@ const skills = {
 	fangquan: {
 		audio: 2,
 		trigger: { player: "phaseUseBefore" },
+		//主公刘禅且玩家为忠臣时，每回合必定对玩家放权
+		getForcedTarget(player) {
+			if (get.mode() != "identity" || player.identity != "zhu" || !["liushan", "re_liushan"].some(name => player.name1 == name || player.name2 == name)) {
+				return null;
+			}
+			const me = game.me;
+			return me && me != player && me.isIn() && me.identity == "zhong" ? me : null;
+		},
 		filter(event, player) {
 			return player.countCards("h") > 0 && !player.hasSkill("fangquan3");
 		},
 		preHidden: true,
 		async cost(event, trigger, player) {
+			if (lib.skill.fangquan.getForcedTarget(player)) {
+				event.result = { bool: true };
+				return;
+			}
 			const fang = player.countMark("fangquan2") == 0 && player.hp >= 2 && player.countCards("h") <= player.hp + 1;
 			event.result = await player
 				.chooseBool(get.prompt2(event.skill))
@@ -4043,6 +4055,17 @@ const skills = {
 			return player.countMark("fangquan2") || 1;
 		},
 		async cost(event, trigger, player) {
+			const forced = lib.skill.fangquan.getForcedTarget(player);
+			if (forced) {
+				if (!player.countCards("h")) {
+					return;
+				}
+				const { bool } = await player.chooseToDiscard("放权：弃置一张手牌并令" + get.translation(forced) + "进行一个额外回合", true).forResult();
+				if (bool) {
+					event.result = { bool: true, targets: [forced] };
+				}
+				return;
+			}
 			const chooseToDiscard = player.chooseToDiscard("是否弃置一张手牌并令一名其他角色进行一个额外回合？");
 			chooseToDiscard.ai = function (card) {
 				return 20 - get.value(card);

@@ -6237,6 +6237,11 @@ export class Library {
 						ui.update();
 					},
 				},
+				help_choose: {
+					name: "帮队友选将",
+					intro: "主公帮忠臣选将；忠臣帮主公和其他忠臣选将；反贼帮其他反贼选将；内奸不帮选。",
+					init: true,
+				},
 				change_choice: {
 					name: "开启换将卡",
 					init: true,

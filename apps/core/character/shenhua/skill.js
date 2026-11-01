@@ -3997,7 +3997,7 @@ const skills = {
 	fangquan: {
 		audio: 2,
 		trigger: { player: "phaseUseBefore" },
-		//主公刘禅且玩家为忠臣时，每回合必定对玩家放权
+		//主公刘禅且玩家为忠臣时：手里能打的牌少则放权给玩家（不会给其他忠臣），能打的牌多则自己打
 		getForcedTarget(player) {
 			if (get.mode() != "identity" || player.identity != "zhu" || !["liushan", "re_liushan"].some(name => player.name1 == name || player.name2 == name)) {
 				return null;
@@ -4005,13 +4005,19 @@ const skills = {
 			const me = game.me;
 			return me && me != player && me.isIn() && me.identity == "zhong" ? me : null;
 		},
+		//手里有多张高收益、可使用的牌（桃、无中生有、南蛮入侵、万箭齐发、顺手牵羊、过河拆桥、决斗）时自己打
+		shouldFang(player) {
+			const names = ["tao", "wuzhong", "nanman", "wanjian", "shunshou", "guohe", "juedou"];
+			const count = player.getCards("h", card => names.includes(card.name) && player.hasUseTarget(card)).length;
+			return count < 2;
+		},
 		filter(event, player) {
 			return player.countCards("h") > 0 && !player.hasSkill("fangquan3");
 		},
 		preHidden: true,
 		async cost(event, trigger, player) {
 			if (lib.skill.fangquan.getForcedTarget(player)) {
-				event.result = { bool: true };
+				event.result = { bool: lib.skill.fangquan.shouldFang(player) };
 				return;
 			}
 			const fang = player.countMark("fangquan2") == 0 && player.hp >= 2 && player.countCards("h") <= player.hp + 1;

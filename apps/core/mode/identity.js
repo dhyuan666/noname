@@ -2506,10 +2506,18 @@ export default {
 							candidates = event.list.slice(0, get.config(`choice_${target.identity}`));
 						}
 						const count = get.config("double_character") ? 2 : 1;
+						//帮队友选将同样可以使用自由选将
+						if (!ui.cheat2 && get.config("free_choose")) {
+							ui.create.cheat2();
+						}
 						const helpResult = await game.me
 							.chooseButton([`帮${get.translation(`${target.identity}2`)}选择角色`, [candidates, "characterx"]], count, true)
 							.set("direct", true)
 							.forResult();
+						if (ui.cheat2) {
+							ui.cheat2.close();
+							delete ui.cheat2;
+						}
 						const names = helpResult.links;
 						if (!names?.length) {
 							continue;

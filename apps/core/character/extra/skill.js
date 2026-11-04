@@ -1185,12 +1185,29 @@ const skills = {
 			combo: "baonu",
 			order: 10,
 			result: {
+				//按“伤害收益 + 对方被弃牌的收益 - 翻面代价”综合估值，而不是只数敌友人数
 				player(player) {
-					return game.countPlayer(function (current) {
-						if (current != player) {
-							return get.sgn(get.damageEffect(current, player, player));
+					let total = 0;
+					for (const current of game.filterPlayer(target => target !== player)) {
+						const attitude = get.attitude(player, current);
+						const lost = current.countCards("e") + Math.min(4, current.countCards("h"));
+						let eff = get.damageEffect(current, player, player);
+						if (attitude < 0) {
+							eff += lost * 0.6;
+						} else if (attitude > 0) {
+							eff -= lost * 0.6;
+						} else {
+							//身份不明的角色视为轻微敌对，神吕布本就是孤军奋战
+							eff += 0.5 + lost * 0.2;
 						}
-					});
+						total += eff;
+					}
+					total -= 1.5;
+					//暴怒标记已满，继续攒就浪费了
+					if (player.countMark("baonu") >= 8) {
+						total += 2;
+					}
+					return total;
 				},
 			},
 		},

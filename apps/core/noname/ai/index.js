@@ -1,8 +1,11 @@
 import { _status, get, lib } from "noname";
 import { Basic } from "./basic.js";
+import { planner } from "./planner.js";
 
 export class AI {
 	basic = new Basic();
+	/** 出牌阶段规划器 */
+	planner = planner;
 	get get() {
 		return get;
 	}

@@ -5252,6 +5252,12 @@ export const Content: Record<string, ContentFuncByAll | ContentFuncsByAll> = {
 			}
 
 			const ok = game.check();
+
+			//AI的出牌阶段：搜索动作序列（牌和技能）并按期望收益选出最优的一步
+			//（需要在game.check()之后调用，此时可用技能列表才已生成）
+			if (event.type == "phase" && !event.skill && !event.forced) {
+				ai.planner.apply(event, player);
+			}
 			if (ok) {
 				ui.click.ok();
 			} else if (ai.basic.chooseCard(event.ai1) || forced) {
